@@ -2,6 +2,7 @@
 #include "client.h"
 #include "http-pool.h"
 
+#include "openssl/evp.h"
 #include "openssl/ssl.h"
 #include "parson.h"
 #include <string.h>
@@ -16,13 +17,14 @@ bud_error_t bud_client_handle_key_ex(struct bud_client_s* client) {
   char body[10240];
   size_t bodysz;
   const char* md;
+  const char* type;
 
   config = client->config;
   if (!config->key_ex.enabled)
     return bud_error(kBudErrKeyExSkip);
 
   ssl = client->ssl;
-  if (!SSL_want_rsa_decrypt(ssl) && !SSL_want_rsa_sign(ssl))
+  if (!SSL_want_rsa_decrypt(ssl) && !SSL_want_sign(ssl))
     return bud_error(kBudErrKeyExSkip);
 
   /* Already running */
@@ -39,12 +41,23 @@ bud_error_t bud_client_handle_key_ex(struct bud_client_s* client) {
   else
     md = OBJ_nid2sn(SSL_get_key_ex_md(ssl));
 
+  if (SSL_get_key_ex_type(ssl) == EVP_PKEY_RSA)
+    type = "rsa";
+  else if (SSL_get_key_ex_type(ssl) == EVP_PKEY_EC)
+    type = "ec";
+  else if (SSL_get_key_ex_type(ssl) == EVP_PKEY_DSA)
+    type = "dsa";
+  else
+    type = "unknown";
+
   bodysz = 0;
   bodysz += snprintf(body,
                      sizeof(body) - bodysz,
-                     "{\"type\":\"%s\",\"md\":\"%s\",\"data\":\"",
-                     SSL_want_rsa_sign(ssl) ? "sign" : "decrypt",
-                     md);
+                     "{\"type\":\"%s\",\"md\":\"%s\",\"type\":\"%s\","
+                        "\"data\":\"",
+                     SSL_want_sign(ssl) ? "sign" : "decrypt",
+                     md,
+                     type);
   bodysz += bud_base64_encode((char*) SSL_get_key_ex_data(ssl),
                               SSL_get_key_ex_len(ssl),
                               body + bodysz,

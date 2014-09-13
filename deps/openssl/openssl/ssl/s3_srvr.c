@@ -494,12 +494,12 @@ int ssl3_accept(SSL *s)
 					goto end;
 				else if (ret == 2)
 					{
-					s->state=SSL3_ST_SW_KEY_EXCH_RSA_SIGN_SUPPLY;
+					s->state=SSL3_ST_SW_KEY_EXCH_SIGN_SUPPLY;
 					break;
 					}
 				else if (ret == 3)
 					{
-					s->state=SSL3_ST_SW_KEY_EXCH_RSA_SIGN_WAIT;
+					s->state=SSL3_ST_SW_KEY_EXCH_SIGN_WAIT;
 					break;
 					}
 				}
@@ -512,12 +512,12 @@ int ssl3_accept(SSL *s)
 			s->init_num=0;
 			break;
 
-		case SSL3_ST_SW_KEY_EXCH_RSA_SIGN_WAIT:
-			s->rwstate=SSL_RSA_SIGN;
+		case SSL3_ST_SW_KEY_EXCH_SIGN_WAIT:
+			s->rwstate=SSL_SIGN;
 			ret = -1;
 			goto end;
 
-		case SSL3_ST_SW_KEY_EXCH_RSA_SIGN_SUPPLY:
+		case SSL3_ST_SW_KEY_EXCH_SIGN_SUPPLY:
 			ret=ssl3_cont_server_key_exchange(s);
 			if (ret != 1)
 				goto end;
@@ -2020,6 +2020,7 @@ int ssl3_send_server_key_exchange(SSL *s)
 						/* Copy md_buf contents to init_buf */
 						s->key_ex.data=&p[2];
 						s->key_ex.md=NID_md5_sha1;
+						s->key_ex.type=pkey->type;
 						s->key_ex.len=j;
 						if (!BUF_MEM_grow(s->init_buf,
 															(s->key_ex.data - d) + s->key_ex.len))
@@ -2075,6 +2076,7 @@ int ssl3_send_server_key_exchange(SSL *s)
 					s->key_ex.data=&p[2];
 					s->key_ex.len=2 * SSL3_RANDOM_SIZE + n;
 					s->key_ex.md=EVP_MD_nid(md);
+					s->key_ex.type=pkey->type;
 					if (!BUF_MEM_grow(s->init_buf,
 														(s->key_ex.data - d) + s->key_ex.len))
 						{

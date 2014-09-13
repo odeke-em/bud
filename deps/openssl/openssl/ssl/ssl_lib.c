@@ -769,8 +769,8 @@ int SSL_supply_key_ex_data(SSL* s, unsigned char* data, long len)
 		case SSL3_ST_SR_KEY_EXCH_RSA_DECRYPT_WAIT:
 			s->state=SSL3_ST_SR_KEY_EXCH_RSA_DECRYPT_SUPPLY;
 			break;
-		case SSL3_ST_SW_KEY_EXCH_RSA_SIGN_WAIT:
-			s->state=SSL3_ST_SW_KEY_EXCH_RSA_SIGN_SUPPLY;
+		case SSL3_ST_SW_KEY_EXCH_SIGN_WAIT:
+			s->state=SSL3_ST_SW_KEY_EXCH_SIGN_SUPPLY;
 			break;
 		default:
 			return 0;
@@ -2564,9 +2564,9 @@ int SSL_get_error(const SSL *s,int i)
 		{
 		return(SSL_ERROR_WANT_RSA_DECRYPT);
 		}
-	if ((i < 0) && SSL_want_rsa_sign(s))
+	if ((i < 0) && SSL_want_sign(s))
 		{
-		return(SSL_ERROR_WANT_RSA_SIGN);
+		return(SSL_ERROR_WANT_SIGN);
 		}
 	if (i == 0)
 		{

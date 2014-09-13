@@ -2621,28 +2621,30 @@ static int handle_async_key_ex(SSL *s)
 		return 0;
 		}
 
-	if (SSL_want_rsa_sign(s) && SSL_get_key_ex_md(s) == NID_md5_sha1)
+	if (SSL_want_sign(s) && SSL_get_key_ex_md(s) == NID_md5_sha1)
 		{
-			unsigned int len;
-			if (pkey->type != EVP_PKEY_RSA)
-				{
-				fprintf(stderr, "async key ex: non-rsa private key for sign\n");
-				return 0;
-				}
-			if (RSA_sign(NID_md5_sha1,
-									 SSL_get_key_ex_data(s),
-									 SSL_get_key_ex_len(s),
-									 buf,
-									 &len,
-									 pkey->pkey.rsa) <= 0)
-				{
-				fprintf(stderr, "async key ex: rsa sign failure\n");
-				return 0;
-				}
-			return SSL_supply_key_ex_data(s, buf, len);
+		assert(SSL_get_key_ex_type(s) == EVP_PKEY_RSA);
+		unsigned int len;
+		if (pkey->type != EVP_PKEY_RSA)
+			{
+			fprintf(stderr, "async key ex: non-rsa private key for sign\n");
+			return 0;
+			}
+		if (RSA_sign(NID_md5_sha1,
+								 SSL_get_key_ex_data(s),
+								 SSL_get_key_ex_len(s),
+								 buf,
+								 &len,
+								 pkey->pkey.rsa) <= 0)
+			{
+			fprintf(stderr, "async key ex: rsa sign failure\n");
+			return 0;
+			}
+		return SSL_supply_key_ex_data(s, buf, len);
 		}
-	if (SSL_want_rsa_sign(s) && SSL_get_key_ex_md(s) != NID_md5_sha1)
+	if (SSL_want_sign(s) && SSL_get_key_ex_md(s) != NID_md5_sha1)
 		{
+		assert(SSL_get_key_ex_type(s) == pkey->type);
 		EVP_MD_CTX md_ctx;
 		const EVP_MD *md = NULL;
 		unsigned int len;
