@@ -53,7 +53,7 @@ bud_error_t bud_client_handle_key_ex(struct bud_client_s* client) {
   bodysz = 0;
   bodysz += snprintf(body,
                      sizeof(body) - bodysz,
-                     "{\"type\":\"%s\",\"md\":\"%s\",\"type\":\"%s\","
+                     "{\"type\":\"%s\",\"md\":\"%s\",\"key\":\"%s\","
                         "\"data\":\"",
                      SSL_want_sign(ssl) ? "sign" : "decrypt",
                      md,
