@@ -655,6 +655,11 @@ bud_error_t bud_context_load(JSON_Object* obj, bud_context_t* ctx) {
   ctx->ecdh = json_object_get_string(obj, "ecdh");
   ctx->dh_file = json_object_get_string(obj, "dh");
   ctx->ticket_key = json_object_get_string(obj, "ticket_key");
+  val = json_object_get_value(obj, "ticket_timeout");
+  if (val != NULL)
+    ctx->ticket_timeout = json_value_get_number(val);
+  else
+    ctx->ticket_timeout = -1;
   ctx->ca_file = json_object_get_string(obj, "ca");
   ctx->ca_array = json_object_get_array(obj, "ca");
   ctx->balance = json_object_get_string(obj, "balance");
@@ -945,6 +950,7 @@ void bud_config_print_default() {
   context.backend.list = &backend;
   context.backend.list[0].keepalive = -1;
   context.backend.count = 1;
+  context.ticket_timeout = -1;
 
   bud_config_set_defaults(&config);
 
@@ -1013,6 +1019,7 @@ void bud_config_print_default() {
   fprintf(stdout, "    \"key\": \"%s\",\n", context.key_file);
   fprintf(stdout, "    \"passphrase\": null,\n");
   fprintf(stdout, "    \"ticket_key\": null,\n");
+  fprintf(stdout, "    \"ticket_timedout\": %d,\n", context.ticket_timeout);
   fprintf(stdout, "    \"request_cert\": false,\n");
   fprintf(stdout, "    \"optional_cert\": false,\n");
   fprintf(stdout, "    \"ca\": null,\n");
@@ -1096,6 +1103,7 @@ void bud_config_set_defaults(bud_config_t* config) {
       DEFAULT(ctx->cert_file, NULL, "keys/cert.pem");
     if (ctx->key_files == NULL)
       DEFAULT(ctx->key_file, NULL, "keys/key.pem");
+    DEFAULT(ctx->ticket_timeout, -1, 300);
     for (j = 0; j < ctx->backend.count; j++)
       bud_config_set_backend_defaults(&ctx->backend.list[j]);
   }
@@ -1399,6 +1407,10 @@ bud_error_t bud_context_init(bud_config_t* config,
   } else {
     SSL_CTX_set_options(ctx, SSL_OP_NO_TICKET);
   }
+  if (context->ticket_timeout != -1)
+    SSL_CTX_set_timeout(ctx, context->ticket_timeout);
+  else if (config->contexts[0].ticket_timeout != -1)
+    SSL_CTX_set_timeout(ctx, config->contexts[0].ticket_timeout);
 
   /* Load CA chain */
   if (context->ca_array != NULL)
