@@ -40,6 +40,7 @@ bud_error_t bud_ipc_init(bud_ipc_t* ipc, bud_config_t* config) {
   }
 
   r = uv_pipe_init(config->loop, ipc->handle, 1);
+  bread_crumb_str("r: %d", r);
   if (r != 0) {
     err = bud_error_num(kBudErrIPCPipeInit, r);
     goto failed_pipe_init;
@@ -75,6 +76,7 @@ bud_error_t bud_ipc_open(bud_ipc_t* ipc, uv_file file) {
 bud_error_t bud_ipc_start(bud_ipc_t* ipc) {
   int r;
 
+  bread_crumb();
   r = uv_read_start((uv_stream_t*) ipc->handle,
                     bud_ipc_alloc_cb,
                     bud_ipc_read_cb);
@@ -96,6 +98,7 @@ void bud_ipc_close(bud_ipc_t* ipc) {
 void bud_ipc_alloc_cb(uv_handle_t* handle,
                       size_t suggested_size,
                       uv_buf_t* buf) {
+  bread_crumb();
   bud_ipc_t* ipc;
   size_t avail;
   char* ptr;
@@ -113,6 +116,8 @@ void bud_ipc_read_cb(uv_stream_t* stream,
                      const uv_buf_t* buf) {
   bud_ipc_t* ipc;
   int r;
+
+  bread_crumb();
 
   /* This should not really happen */
   ASSERT(nread != UV_EOF, "Unexpected EOF on ipc pipe");
@@ -153,6 +158,7 @@ void bud_ipc_read_cb(uv_stream_t* stream,
 void bud_ipc_parse(bud_ipc_t* ipc) {
   /* Loop while there is some data to parse */
   while (ringbuffer_size(&ipc->buffer) >= ipc->waiting) {
+    bread_crumb_str("Got a state: %d\n", ipc->state);
     switch (ipc->state) {
       case kBudIPCType:
         {
@@ -257,6 +263,7 @@ void bud_ipc_msg_send_cb(uv_write_t* req, int status) {
     return;
 
   msg = container_of(req, bud_ipc_msg_handle_t, req);
+  bread_crumb_str("msg_handle: %p", msg);
   uv_close((uv_handle_t*) &msg->tcp, bud_ipc_msg_handle_on_close);
 
   /* Error */

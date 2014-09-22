@@ -235,6 +235,7 @@ void bud_master_signal_cb(uv_signal_t* handle, int signum) {
 
   config = handle->data;
 
+  bread_crumb();
   /* Stop the loop and let finalize to be called */
   if (config->signal.sighup != handle)
     return uv_stop(handle->loop);
@@ -259,6 +260,7 @@ void bud_master_signal_cb(uv_signal_t* handle, int signum) {
   }
 
   err = bud_master_spawn_workers(config);
+  bread_crumb_str("Done spawning workers: IsErr ? %s", bud_is_ok(err) ? "no" : "yes");
   if (!bud_is_ok(err))
     goto restore;
 
@@ -380,8 +382,12 @@ bud_error_t bud_master_spawn_worker(bud_worker_t* worker) {
 
     /* Pending accept - try balancing */
     if (config->pending_accept) {
+      bread_crumb_str("Try balancing!");
       config->pending_accept = 0;
       bud_master_balance(config->server);
+    } else {
+        bread_crumb_str("Done accepting the balance");
+        // Send the configuration JSON
     }
   }
 
@@ -498,6 +504,8 @@ void bud_master_balance(struct bud_server_s* server) {
     worker = &config->workers[config->last_worker];
   } while (!(worker->state & kBudWorkerStateActive) &&
            config->last_worker != last_index);
+
+  bread_crumb();
 
   /* All workers are down... wait */
   if (!(worker->state & kBudWorkerStateActive)) {

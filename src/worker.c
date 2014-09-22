@@ -33,6 +33,7 @@ bud_error_t bud_worker(bud_config_t* config) {
   config->ipc.client_cb = bud_worker_ipc_client_cb;
 
   err = bud_ipc_open(&config->ipc, 0);
+  bread_crumb_str("Opened the ipc pipe. IsErr ? %s", bud_is_ok(err) ? "No" : "Yes");
   if (!bud_is_ok(err))
     goto failed_ipc_open;
 
@@ -60,6 +61,8 @@ bud_error_t bud_worker(bud_config_t* config) {
     goto failed_signal_start;
   }
 
+  bread_crumb_str("WorkerConfigPath: %s", config->path);
+
 #ifndef _WIN32
   /* Drop privileges */
   err = bud_config_drop_privileges(config);
@@ -79,6 +82,7 @@ failed_signal_init:
   config->signal.sighup = NULL;
 
 failed_ipc_open:
+  bread_crumb_str("Failed to open the pipe");
   bud_ipc_close(&config->ipc);
 
 fatal:

@@ -5,6 +5,20 @@
 #include <stdlib.h>
 
 #include "error.h"
+#define _bread_crumb(...) {                                                   \
+    fprintf(stderr, "\033[%dm[%s :: %s] @ %d\033[00m ",                       \
+        __LINE__ & 1 ? 95 : 94, __FILE__, __func__, __LINE__);                \
+    fprintf(stderr, __VA_ARGS__);                                             \
+    fprintf(stderr, "\n");                                                    \
+}
+
+#define bread_crumb() {                                                       \
+    _bread_crumb("");                                                         \
+}
+
+#define bread_crumb_str(...) {                                                \
+    _bread_crumb(__VA_ARGS__);                                                \
+}
 
 #define ASSERT__COMMON(expr, desc, ...)                                       \
     do {                                                                      \

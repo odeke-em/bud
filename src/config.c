@@ -353,16 +353,21 @@ bud_config_t* bud_config_load(const char* path, int inlined, bud_error_t* err) {
 
   /* Backend configuration */
   config->balance = json_object_get_string(obj, "balance");
+  bread_crumb_str("Balance: %s", config->balance);
   *err = bud_config_load_backend_list(config,
                                       obj,
                                       &config->contexts[0].backend);
+
+  bread_crumb_str("After allocating contexts errd? %s", bud_is_ok(*err) ? "no" : "yes");
   if (!bud_is_ok(*err))
     goto failed_alloc_contexts;
+
 
   /* User and group configuration */
   config->user = json_object_get_string(obj, "user");
   config->group = json_object_get_string(obj, "group");
 
+  bread_crumb_str("User: %s Group: %s", config->user, config->group);
   /* SNI configuration */
   bud_config_read_pool_conf(obj, "sni", &config->sni);
 
@@ -408,6 +413,7 @@ failed_load_context:
   }
 
 failed_alloc_contexts:
+  bread_crumb_str("Failed to alloc contexts");
   free(config->contexts);
   config->contexts = NULL;
   free(config->trace.dso);
