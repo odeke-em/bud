@@ -114,7 +114,10 @@ enum bud_error_code_e {
   kBudErrIPCReadStart = 0x902,
   kBudErrIPCBalanceInit = 0x903,
   kBudErrIPCBalanceAccept = 0x904,
-  kBudErrIPCBalanceWrite = 0x905
+  kBudErrIPCBalanceWrite = 0x905,
+  kBudErrIPCConfigInit = 0x906,
+  kBudErrIPCConfigAccept = 0x907,
+  kBudErrIPCConfigWrite = 0x908
 };
 
 struct bud_error_s {

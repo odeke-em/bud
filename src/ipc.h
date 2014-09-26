@@ -58,6 +58,9 @@ bud_error_t bud_ipc_init(bud_ipc_t* ipc, struct bud_config_s* config);
 bud_error_t bud_ipc_open(bud_ipc_t* ipc, uv_file file);
 bud_error_t bud_ipc_start(bud_ipc_t* ipc);
 bud_error_t bud_ipc_balance(bud_ipc_t* ipc, uv_stream_t* server);
+bud_error_t bud_ipc_send_config(bud_ipc_t* ipc, uv_stream_t* server,
+                                    char* config, const size_t config_len);
+
 uv_stream_t* bud_ipc_get_stream(bud_ipc_t* ipc);
 void bud_ipc_close(bud_ipc_t* ipc);
 

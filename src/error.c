@@ -245,10 +245,16 @@ bud_error_t bud_error_num(bud_error_code_t code, int ret) {
       BUD_ERROR("failed to prepend x-forwarded-for header")                   \
     case kBudErrIPCBalanceInit:                                               \
       BUD_UV_ERROR("bud_ipc_balance() uv_tcp_init", err)                      \
+    case kBudErrIPCConfigInit:                                                \
+      BUD_UV_ERROR("bud_ipc_config() uv_tcp_init", err)                       \
     case kBudErrIPCBalanceAccept:                                             \
       BUD_UV_ERROR("bud_ipc_balance() uv_accept", err)                        \
+    case kBudErrIPCConfigAccept:                                              \
+      BUD_UV_ERROR("bud_ipc_config() uv_accept", err)                         \
     case kBudErrIPCBalanceWrite:                                              \
       BUD_UV_ERROR("bud_ipc_balance()", err)                                  \
+    case kBudErrIPCConfigWrite:                                               \
+      BUD_UV_ERROR("bud_ipc_config()", err)                                   \
     default:                                                                  \
       UNEXPECTED;                                                             \
   }

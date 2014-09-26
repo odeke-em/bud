@@ -296,11 +296,25 @@ bud_error_t bud_master_spawn_workers(bud_config_t* config) {
     config->workers[i].index = i;
     err = bud_master_spawn_worker(&config->workers[i]);
 
-    if (!bud_is_ok(err))
+    if (!bud_is_ok(err)) {
       while (i-- > 0)
         bud_master_kill_worker(&config->workers[i], 0, NULL);
+
+      goto killed_workers;
+    }
   }
 
+  /* Time to send the piped configs */
+  if (config->inlined) {
+    config->last_worker = 0;
+    for (i=0; i < config->worker_count; i++) {
+      bud_master_send_config(config->server);
+    }
+  }
+
+  return bud_ok();
+
+killed_workers:
   return err;
 }
 
@@ -342,6 +356,9 @@ bud_error_t bud_master_spawn_worker(bud_worker_t* worker) {
     err = bud_error(kBudErrNoMem);
     goto done;
   }
+
+  for (i = 0; i < config->argc; i++)
+    printf("arg[%d] : %s\n", i, config->argv[i]);
 
   /* args = { config.argv, "--worker" } */
   for (i = 0; i < config->argc; i++)
@@ -385,21 +402,21 @@ bud_error_t bud_master_spawn_worker(bud_worker_t* worker) {
       bread_crumb_str("Try balancing!");
       config->pending_accept = 0;
       bud_master_balance(config->server);
-    } else {
-        bread_crumb_str("Done accepting the balance");
-        // Send the configuration JSON
     }
   }
 
   goto done;
 
 failed_uv_spawn:
+  bread_crumb_str("failed_uv_spawn");
   bud_ipc_close(&worker->ipc);
 
 failed_ipc_init:
+  bread_crumb_str("failed_ipc_init");
   uv_close((uv_handle_t*) &worker->restart_timer, bud_master_ipc_close_cb);
 
 done:
+  bread_crumb_str("Success & Done\n");
   free(options.stdio);
   free(options.args);
   options.stdio = NULL;
@@ -476,6 +493,55 @@ void bud_worker_close_cb(uv_handle_t* handle) {
 
 void bud_master_ipc_close_cb(uv_handle_t* handle) {
   /* No-op */
+}
+
+
+void bud_master_send_config(struct bud_server_s* server) {
+  bud_error_t err;
+  bud_config_t* config;
+  bud_worker_t* worker;
+  int last_index;
+
+  config = server->config;
+
+  if (config->worker_count == 0) {
+    bud_clog(config, kBudLogDebug, "master self accept");
+
+    /* Master = worker */
+    return bud_client_create(config, (uv_stream_t*) &server->tcp);
+  }
+
+  bud_clog(config, kBudLogDebug, "master ipc config send");
+
+  /* Round-robin worker selection */
+  last_index = (config->last_worker + 1) % config->worker_count;
+  do {
+    bread_crumb_str("LastWorker: %d\n", config->last_worker);
+    config->last_worker++;
+    config->last_worker %= config->worker_count;
+    worker = &config->workers[config->last_worker];
+  } while (!(worker->state & kBudWorkerStateActive) &&
+           config->last_worker != last_index);
+
+
+  /* All workers are down... wait */
+  if (!(worker->state & kBudWorkerStateActive)) {
+    bread_crumb_str("All workers down");
+    config->pending_accept = 1;
+    return;
+  }
+
+  err = bud_ipc_start(&worker->ipc);
+  if (!bud_is_ok(err))
+    bud_error_log(config, kBudLogWarning, err);
+  else {
+    err = bud_ipc_send_config(
+        &worker->ipc, (uv_stream_t*) &server->tcp, config->path, strlen(config->path));
+
+    bread_crumb_str("AfterConfigSend: BudIsOK ? %d\n", bud_is_ok(err));
+    if (!bud_is_ok(err))
+      bud_error_log(config, kBudLogWarning, err);
+  }
 }
 
 

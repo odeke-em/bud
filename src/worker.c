@@ -61,7 +61,7 @@ bud_error_t bud_worker(bud_config_t* config) {
     goto failed_signal_start;
   }
 
-  bread_crumb_str("WorkerConfigPath: %s", config->path);
+  bread_crumb_str("WorkerConfigPath: %s\n", config->path);
 
 #ifndef _WIN32
   /* Drop privileges */

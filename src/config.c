@@ -225,7 +225,7 @@ bud_config_t* bud_config_load(const char* path, int inlined, bud_error_t* err) {
   bud_config_t* config;
 
   str_from_file = NULL;
-
+  
   if (path == NULL) {
     *err = bud_read_file_by_fd(0, &str_from_file);
     if (!bud_is_ok(*err)) {
@@ -263,6 +263,7 @@ bud_config_t* bud_config_load(const char* path, int inlined, bud_error_t* err) {
       /* Was already allocated, reuse that memory with the assumption that destruction 
          of config will  free this path mem: similar to the strdup(...) call above */
       config->path = str_from_file;
+      inlined = 1;
     } else {
       *err = bud_error_str(kBudErrNoMem, "bud_config_t null config passed in");
       goto end;
@@ -353,12 +354,11 @@ bud_config_t* bud_config_load(const char* path, int inlined, bud_error_t* err) {
 
   /* Backend configuration */
   config->balance = json_object_get_string(obj, "balance");
-  bread_crumb_str("Balance: %s", config->balance);
+  // bread_crumb_str("Balance: %s path: %s isInlined: %d\n", config->balance, path, inlined);
   *err = bud_config_load_backend_list(config,
                                       obj,
                                       &config->contexts[0].backend);
 
-  bread_crumb_str("After allocating contexts errd? %s", bud_is_ok(*err) ? "no" : "yes");
   if (!bud_is_ok(*err))
     goto failed_alloc_contexts;
 
@@ -400,6 +400,7 @@ bud_config_t* bud_config_load(const char* path, int inlined, bud_error_t* err) {
   bud_config_set_defaults(config);
 
   *err = bud_ok();
+  bread_crumb_str("Exiting now!");
   return config;
 
 failed_load_context:
