@@ -304,14 +304,6 @@ bud_error_t bud_master_spawn_workers(bud_config_t* config) {
     }
   }
 
-  /* Time to send the piped configs */
-  if (config->inlined) {
-    config->last_worker = 0;
-    for (i=0; i < config->worker_count; i++) {
-      bud_master_send_config(config->server);
-    }
-  }
-
   return bud_ok();
 
 killed_workers:
@@ -402,6 +394,7 @@ bud_error_t bud_master_spawn_worker(bud_worker_t* worker) {
       bread_crumb_str("Try balancing!");
       config->pending_accept = 0;
       bud_master_balance(config->server);
+    } else { /* Send in that configuration */
     }
   }
 
@@ -496,51 +489,12 @@ void bud_master_ipc_close_cb(uv_handle_t* handle) {
 }
 
 
-void bud_master_send_config(struct bud_server_s* server) {
+void bud_master_send_config(bud_worker_t* worker) {
   bud_error_t err;
-  bud_config_t* config;
-  bud_worker_t* worker;
-  int last_index;
-
-  config = server->config;
-
-  if (config->worker_count == 0) {
-    bud_clog(config, kBudLogDebug, "master self accept");
-
-    /* Master = worker */
-    return bud_client_create(config, (uv_stream_t*) &server->tcp);
-  }
-
-  bud_clog(config, kBudLogDebug, "master ipc config send");
-
-  /* Round-robin worker selection */
-  last_index = (config->last_worker + 1) % config->worker_count;
-  do {
-    bread_crumb_str("LastWorker: %d\n", config->last_worker);
-    config->last_worker++;
-    config->last_worker %= config->worker_count;
-    worker = &config->workers[config->last_worker];
-  } while (!(worker->state & kBudWorkerStateActive) &&
-           config->last_worker != last_index);
-
-
-  /* All workers are down... wait */
-  if (!(worker->state & kBudWorkerStateActive)) {
-    bread_crumb_str("All workers down");
-    config->pending_accept = 1;
-    return;
-  }
-
-  err = bud_ipc_start(&worker->ipc);
-  if (!bud_is_ok(err))
-    bud_error_log(config, kBudLogWarning, err);
-  else {
-    err = bud_ipc_send_config(
-        &worker->ipc, (uv_stream_t*) &server->tcp, config->path, strlen(config->path));
-
-    bread_crumb_str("AfterConfigSend: BudIsOK ? %d\n", bud_is_ok(err));
-    if (!bud_is_ok(err))
-      bud_error_log(config, kBudLogWarning, err);
+  bread_crumb_str("Worker trying to send config: %p\n", worker);
+  err = bud_ipc_send_config(&worker->ipc, worker->config->path, strlen(worker->config->path));
+  if (!bud_is_ok(err)) {
+    bud_clog(worker->config, kBudLogWarning, "Failed to send the config");
   }
 }
 
@@ -571,7 +525,7 @@ void bud_master_balance(struct bud_server_s* server) {
   } while (!(worker->state & kBudWorkerStateActive) &&
            config->last_worker != last_index);
 
-  bread_crumb();
+  bread_crumb_str("server: %p\n", server);
 
   /* All workers are down... wait */
   if (!(worker->state & kBudWorkerStateActive)) {

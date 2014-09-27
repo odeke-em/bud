@@ -34,6 +34,6 @@ struct bud_worker_s {
 bud_error_t bud_master(bud_config_t* config);
 bud_error_t bud_master_finalize(bud_config_t* config);
 void bud_master_balance(struct bud_server_s* server);
-void bud_master_send_config(struct bud_server_s* server);
+void bud_master_send_config(bud_worker_t* worker);
 
 #endif  /* SRC_MASTER_H_ */

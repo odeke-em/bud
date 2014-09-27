@@ -400,7 +400,6 @@ bud_config_t* bud_config_load(const char* path, int inlined, bud_error_t* err) {
   bud_config_set_defaults(config);
 
   *err = bud_ok();
-  bread_crumb_str("Exiting now!");
   return config;
 
 failed_load_context:

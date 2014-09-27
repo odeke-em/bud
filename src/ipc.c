@@ -75,10 +75,11 @@ bud_error_t bud_ipc_open(bud_ipc_t* ipc, uv_file file) {
 bud_error_t bud_ipc_start(bud_ipc_t* ipc) {
   int r;
 
-  bread_crumb_str("IPC: %p\n", ipc);
   r = uv_read_start((uv_stream_t*) ipc->handle,
                     bud_ipc_alloc_cb,
                     bud_ipc_read_cb);
+
+  bread_crumb_str("IPC: %p r: %d\n", ipc, r);
   if (r != 0)
     return bud_error_num(kBudErrIPCReadStart, r);
 
@@ -190,14 +191,9 @@ void bud_ipc_parse(bud_ipc_t* ipc) {
 }
 
 
-bud_error_t bud_ipc_send_config(
-                bud_ipc_t* ipc,
-                uv_stream_t* server,
-                char* config,
-                const size_t config_len) {
+bud_error_t bud_ipc_send_config(bud_ipc_t* ipc, char* config, const size_t config_len) {
   bud_error_t err;
   int r;
-  uint8_t type;
   uv_buf_t buf;
   bud_ipc_msg_handle_t* handle;
 
@@ -216,21 +212,6 @@ bud_error_t bud_ipc_send_config(
     goto failed_tcp_init;
   }
 
-  /* Accept handle */
-  do {
-    r = uv_accept(server, (uv_stream_t*) &handle->tcp);
-    bread_crumb_str("handle->tcp: %p\n..", &handle->tcp);
-  } while (r == EAGAIN);
-
-  bread_crumb_str("R: %d %d\n", r, r == EAGAIN);
-
-  if (r != 0 && r != EAGAIN) {
-    err = bud_error_num(kBudErrIPCConfigAccept, r);
-    goto failed_accept;
-  }
-
-  /* Initialize the config body */
-  type = kBudIPCConfig;
   buf = uv_buf_init(config, config_len);
   bread_crumb_str("Buf: %p config: %s config_len: %zd\n", &buf, config, config_len);
 
@@ -245,16 +226,24 @@ bud_error_t bud_ipc_send_config(
     goto failed_accept;
   }
 
+  err = bud_ipc_start(ipc);
+  if (!bud_is_ok(err))
+    goto failed_ipc_start;
   bread_crumb_str("Accepted!!");
   return bud_ok();
 
 failed_accept:
-  bread_crumb_str("Failed to accept");
+  bread_crumb_str("Failed to accept: r: %d", r);
+  uv_close((uv_handle_t*) &handle->tcp, bud_ipc_msg_handle_on_close);
+  return err;
+
+failed_ipc_start:
+  bread_crumb_str("Failed ipc start: r:: %d", r);
   uv_close((uv_handle_t*) &handle->tcp, bud_ipc_msg_handle_on_close);
   return err;
 
 failed_tcp_init:
-  bread_crumb_str("Failed to init tcp");
+  bread_crumb_str("Failed to init tcp r:: %d", r);
   free(handle);
 
 failed_malloc:
@@ -291,6 +280,8 @@ bud_error_t bud_ipc_balance(bud_ipc_t* ipc, uv_stream_t* server) {
     err = bud_error(kBudErrIPCBalanceAccept);
     goto failed_accept;
   }
+
+  bread_crumb_str("r: %d\n", r);
 
   /* Init IPC message */
   type = kBudIPCBalance;

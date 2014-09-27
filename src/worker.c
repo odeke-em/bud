@@ -33,6 +33,7 @@ bud_error_t bud_worker(bud_config_t* config) {
   config->ipc.client_cb = bud_worker_ipc_client_cb;
 
   err = bud_ipc_open(&config->ipc, 0);
+
   bread_crumb_str("Opened the ipc pipe. IsErr ? %s", bud_is_ok(err) ? "No" : "Yes");
   if (!bud_is_ok(err))
     goto failed_ipc_open;
@@ -62,6 +63,9 @@ bud_error_t bud_worker(bud_config_t* config) {
   }
 
   bread_crumb_str("WorkerConfigPath: %s\n", config->path);
+  err = bud_ipc_send_config(&config->ipc, "aloha\0", 5);
+  if (!bud_is_ok(err))
+    bread_crumb_str("Failed to send config!");
 
 #ifndef _WIN32
   /* Drop privileges */
