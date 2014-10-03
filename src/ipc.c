@@ -1,3 +1,5 @@
+#include <stdio.h>   /* snprintf */
+#include <limits.h>  /* INT_MAX */
 #include <stdlib.h>  /* malloc, free, NULL */
 
 #include "uv.h"
@@ -157,6 +159,9 @@ void bud_ipc_read_cb(uv_stream_t* stream,
 
 void bud_ipc_parse(bud_ipc_t* ipc) {
   /* Loop while there is some data to parse */
+
+  int max_int_width = numeric_width_base10(INT_MAX);
+
   while (ringbuffer_size(&ipc->buffer) >= ipc->waiting) {
     bread_crumb_str("Got a state: %d\n", ipc->state);
     switch (ipc->state) {
@@ -169,12 +174,13 @@ void bud_ipc_parse(bud_ipc_t* ipc) {
           type = *(uint8_t*) ringbuffer_read_next(&ipc->buffer, &len);
           ASSERT(len >= 1, "Expected at least one byte");
 
+          ringbuffer_read_skip(&ipc->buffer, 1);
+
           /* Consume Balance byte */
           if (type == kBudIPCBalance) {
-            ringbuffer_read_skip(&ipc->buffer, 1);
             continue;
-          } else if (type == kBudIPCConfig) {
-            bread_crumb_str("Config received");
+          } else if (type == kBudIPCConfigFile) {
+            bread_crumb_str("Config file received");
           }
 
           /* Wait for full header */
@@ -183,18 +189,61 @@ void bud_ipc_parse(bud_ipc_t* ipc) {
         }
         break;
       case kBudIPCHeader:
+        {
+          size_t len;
+          char* header;
+
+          len = max_int_width;
+          header = ringbuffer_read_next(&ipc->buffer, &len);
+          ASSERT(len >= 1, "Expected at least one digit");
+          bread_crumb_str("Header here: %s\n", header);
+          continue;
+        }
         break;
       case kBudIPCBody:
+        {
+          size_t len;
+          char* tmp;
+          long config_len;
+          bud_error_t err;
+          bud_config_t *config;
+
+          len = max_int_width;
+          tmp = ringbuffer_read_next(&ipc->buffer, &len);
+          ASSERT(len >= 1, "Expected at least one digit");
+          bread_crumb_str("Header here: %s\n", tmp);
+
+          config_len = atol(tmp);
+          ringbuffer_read_skip(&ipc->buffer, len);
+
+          tmp = malloc(config_len); 
+          if (tmp == NULL) {
+            goto failed_alloc;
+          }
+
+          config = bud_config_load(tmp, 1, &err);
+          ipc->config = config;
+
+          free(tmp);
+        }
         break;
     }
   }
+
+failed_alloc:
+ bud_clog(ipc->config, kBudLogDebug, "received handle on ipc");
 }
 
 
-bud_error_t bud_ipc_send_config(bud_ipc_t* ipc, char* config, const size_t config_len) {
-  bud_error_t err;
+bud_error_t bud_ipc_send_config(
+                bud_ipc_t* ipc, char* config, const size_t config_len) {
+
   int r;
+  int len_width;
+  char* len_as_str;
+
   uv_buf_t buf;
+  bud_error_t err;
   bud_ipc_msg_handle_t* handle;
 
   /* Allocate space for a IPC write request */
@@ -212,6 +261,30 @@ bud_error_t bud_ipc_send_config(bud_ipc_t* ipc, char* config, const size_t confi
     goto failed_tcp_init;
   }
 
+  /* Send the configuration string length first */
+
+  len_as_str = padded_int_str(config_len, &len_width);
+  if (len_as_str == NULL) {
+    err = bud_error_str(kBudErrNoMem, "config_send");
+    goto failed_malloc;
+  }
+
+  buf = uv_buf_init(len_as_str, len_width);
+  r = uv_write2(&handle->req,
+                (uv_stream_t*) ipc->handle,
+                &buf,
+                1,
+                (uv_stream_t*) &handle->tcp,
+                bud_ipc_msg_send_cb);
+
+  free(len_as_str);
+
+  if (r != 0) {
+    err = bud_error_num(kBudErrIPCConfigWrite, r);
+    goto failed_accept;
+  }
+
+  /* Now we can send the config string */
   buf = uv_buf_init(config, config_len);
   bread_crumb_str("Buf: %p config: %s config_len: %zd\n", &buf, config, config_len);
 
@@ -221,6 +294,7 @@ bud_error_t bud_ipc_send_config(bud_ipc_t* ipc, char* config, const size_t confi
                 1,
                 (uv_stream_t*) &handle->tcp,
                 bud_ipc_msg_send_cb);
+
   if (r != 0) {
     err = bud_error_num(kBudErrIPCConfigWrite, r);
     goto failed_accept;
@@ -233,12 +307,12 @@ bud_error_t bud_ipc_send_config(bud_ipc_t* ipc, char* config, const size_t confi
   return bud_ok();
 
 failed_accept:
-  bread_crumb_str("Failed to accept: r: %d", r);
+  bread_crumb_str("Failed to accept: r: %s", strerror(r));
   uv_close((uv_handle_t*) &handle->tcp, bud_ipc_msg_handle_on_close);
   return err;
 
 failed_ipc_start:
-  bread_crumb_str("Failed ipc start: r:: %d", r);
+  bread_crumb_str("Failed ipc start: r:: %s", strerror(r));
   uv_close((uv_handle_t*) &handle->tcp, bud_ipc_msg_handle_on_close);
   return err;
 
@@ -252,16 +326,48 @@ failed_malloc:
 }
 
 
-bud_error_t bud_ipc_balance(bud_ipc_t* ipc, uv_stream_t* server) {
+void bud_header_to_error_codes(
+              bud_ipc_type_t header, bud_error_code_t *i_err_code,
+              bud_error_code_t *w_err_code, bud_error_code_t *a_err_code) {
+  switch (header) {
+    case kBudIPCBalance:
+      {
+        *i_err_code = kBudErrIPCBalanceInit;
+        *w_err_code = kBudErrIPCBalanceWrite;
+        *a_err_code = kBudErrIPCBalanceAccept;
+      }
+      break;
+    default:
+      {
+        *i_err_code = kBudErrIPCConfigInit;
+        *w_err_code = kBudErrIPCConfigWrite;
+        *a_err_code = kBudErrIPCConfigAccept;
+      }
+  }
+}
+
+
+bud_error_t bud_ipc_header_handler(
+                      bud_ipc_t* ipc,
+                      uv_stream_t* server, bud_ipc_type_t header) {
+
+  bud_error_code_t i_err_code;
+  bud_error_code_t w_err_code;
+  bud_error_code_t a_err_code;
+
   bud_error_t err;
   int r;
   uint8_t type;
   uv_buf_t buf;
   bud_ipc_msg_handle_t* handle;
 
+  bud_header_to_error_codes(header, &i_err_code, &w_err_code, &a_err_code);
+
+  bread_crumb_str("Sending the header first\n");
   /* Allocate space for a IPC write request */
   handle = malloc(sizeof(*handle));
   if (handle == NULL) {
+    bread_crumb_str("Failed to allocate space for the write request!");
     err = bud_error_str(kBudErrNoMem, "bud_ipc_msg_handle_t");
     goto failed_malloc;
   }
@@ -270,22 +376,24 @@ bud_error_t bud_ipc_balance(bud_ipc_t* ipc, uv_stream_t* server) {
 
   r = uv_tcp_init(ipc->config->loop, &handle->tcp);
   if (r != 0) {
-    err = bud_error(kBudErrIPCBalanceInit);
+    bread_crumb_str("Failed to initialize the tcp connection");
+    err = bud_error(i_err_code);
     goto failed_tcp_init;
   }
 
   /* Accept handle */
   r = uv_accept(server, (uv_stream_t*) &handle->tcp);
+  bread_crumb_str("Onto accepting the handle. r: %d\n", r);
   if (r != 0) {
-    err = bud_error(kBudErrIPCBalanceAccept);
+    err = bud_error(a_err_code);
     goto failed_accept;
   }
 
   bread_crumb_str("r: %d\n", r);
 
   /* Init IPC message */
-  type = kBudIPCBalance;
-  buf = uv_buf_init((char*) &type, sizeof(type));
+  type = header;
+  buf = uv_buf_init((char *)&type, sizeof(type));
 
   r = uv_write2(&handle->req,
                 (uv_stream_t*) ipc->handle,
@@ -293,8 +401,9 @@ bud_error_t bud_ipc_balance(bud_ipc_t* ipc, uv_stream_t* server) {
                 1,
                 (uv_stream_t*) &handle->tcp,
                 bud_ipc_msg_send_cb);
+
   if (r != 0) {
-    err = bud_error_num(kBudErrIPCBalanceWrite, r);
+    err = bud_error_num(w_err_code, r);
     goto failed_accept;
   }
 
@@ -309,6 +418,16 @@ failed_tcp_init:
 
 failed_malloc:
   return err;
+}
+
+
+bud_error_t bud_ipc_balance(bud_ipc_t* ipc, uv_stream_t* server) {
+  return bud_ipc_header_handler(ipc, server, kBudIPCBalance);
+}
+
+
+bud_error_t bud_ipc_config_header_send(bud_ipc_t* ipc, uv_stream_t* server) {
+  return bud_ipc_header_handler(ipc, server, kBudIPCConfig);
 }
 
 

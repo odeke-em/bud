@@ -37,6 +37,7 @@ int main(int argc, char** argv) {
 
   config = bud_config_cli_load(argc, argv, &err);
 
+  bread_crumb_str("Here: %p", config);
   /* NOTE: bud_config_load will print everything itself */
   if (config == NULL)
     goto fatal;
@@ -64,6 +65,7 @@ int main(int argc, char** argv) {
   uv_run(config->loop, UV_RUN_NOWAIT);
 
 fatal:
+  bread_crumb_str("Failed for spawned!");
   if (config != NULL)
     bud_config_free(config);
 

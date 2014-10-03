@@ -218,6 +218,7 @@ struct bud_config_s {
   bud_config_balance_t balance_e;
 
   /* Options from config file */
+  int piped;
   int inlined;
   char* path;
 

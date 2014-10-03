@@ -63,9 +63,6 @@ bud_error_t bud_worker(bud_config_t* config) {
   }
 
   bread_crumb_str("WorkerConfigPath: %s\n", config->path);
-  err = bud_ipc_send_config(&config->ipc, "aloha\0", 5);
-  if (!bud_is_ok(err))
-    bread_crumb_str("Failed to send config!");
 
 #ifndef _WIN32
   /* Drop privileges */
@@ -117,6 +114,7 @@ void bud_worker_ipc_client_cb(bud_ipc_t* ipc) {
 void bud_worker_signal_cb(uv_signal_t* signal, int status) {
   bud_config_t* config;
 
+  bread_crumb();
   config = signal->data;
   if (status == UV_ECANCELED)
     return;

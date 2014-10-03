@@ -27,6 +27,7 @@ struct bud_worker_s {
   bud_ipc_t ipc;
   uv_timer_t restart_timer;
   int close_waiting;
+  bud_hashmap_t* config_map;
 
   bud_worker_kill_cb kill_cb;
 };
@@ -34,6 +35,7 @@ struct bud_worker_s {
 bud_error_t bud_master(bud_config_t* config);
 bud_error_t bud_master_finalize(bud_config_t* config);
 void bud_master_balance(struct bud_server_s* server);
-void bud_master_send_config(bud_worker_t* worker);
+bud_error_t bud_master_send_config(
+        bud_worker_t* worker, struct bud_server_s* server);
 
 #endif  /* SRC_MASTER_H_ */

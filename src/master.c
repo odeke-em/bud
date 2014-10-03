@@ -297,9 +297,6 @@ bud_error_t bud_master_spawn_workers(bud_config_t* config) {
     err = bud_master_spawn_worker(&config->workers[i]);
 
     if (!bud_is_ok(err)) {
-      while (i-- > 0)
-        bud_master_kill_worker(&config->workers[i], 0, NULL);
-
       goto killed_workers;
     }
   }
@@ -307,6 +304,9 @@ bud_error_t bud_master_spawn_workers(bud_config_t* config) {
   return bud_ok();
 
 killed_workers:
+  while (i-- > 0)
+    bud_master_kill_worker(&config->workers[i], 0, NULL);
+
   return err;
 }
 
@@ -394,7 +394,14 @@ bud_error_t bud_master_spawn_worker(bud_worker_t* worker) {
       bread_crumb_str("Try balancing!");
       config->pending_accept = 0;
       bud_master_balance(config->server);
-    } else { /* Send in that configuration */
+    } else {
+      bread_crumb_str("Done balancing!");
+      if (config->piped) {
+        bread_crumb_str("Since is piped!");
+        err = bud_master_send_config(worker, config->server);
+        if (!bud_is_ok(err))
+          goto failed_ipc_init;
+      }
     }
   }
 
@@ -489,13 +496,34 @@ void bud_master_ipc_close_cb(uv_handle_t* handle) {
 }
 
 
-void bud_master_send_config(bud_worker_t* worker) {
+bud_error_t bud_master_send_config(
+                     bud_worker_t* worker, struct bud_server_s* server) {
+
   bud_error_t err;
-  bread_crumb_str("Worker trying to send config: %p\n", worker);
-  err = bud_ipc_send_config(&worker->ipc, worker->config->path, strlen(worker->config->path));
+  char* config_str;
+
+  config_str = worker->config->path;
+  bread_crumb_str("Trying to send config to worker\n");
+
+  bud_clog(worker->config, kBudLogDebug, "master config send");
+
+  err = bud_ipc_config_header_send(&worker->ipc, (uv_stream_t*) &server->tcp);
   if (!bud_is_ok(err)) {
-    bud_clog(worker->config, kBudLogWarning, "Failed to send the config");
+    bud_error_log(worker->config, kBudLogWarning, err);
+  } else {
+    /* Send the length of the config string */
+    
+    err = bud_ipc_send_config(&worker->ipc, config_str, strlen(config_str));
+    if (!bud_is_ok(err)) {
+      bud_clog(worker->config,
+              kBudLogWarning,
+              "ip send config failed");
+    } else {
+      bud_clog(worker->ipc.config, kBudLogDebug, "sent configuration");
+    }
   }
+
+  return bud_ok();
 }
 
 

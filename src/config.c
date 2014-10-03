@@ -133,6 +133,7 @@ bud_config_t* bud_config_cli_load(int argc, char** argv, bud_error_t* err) {
           c = -1;
           break;
         }
+
         if (is_daemon)
           config->is_daemon = 1;
         if (is_worker)
@@ -263,7 +264,6 @@ bud_config_t* bud_config_load(const char* path, int inlined, bud_error_t* err) {
       /* Was already allocated, reuse that memory with the assumption that destruction 
          of config will  free this path mem: similar to the strdup(...) call above */
       config->path = str_from_file;
-      inlined = 1;
     } else {
       *err = bud_error_str(kBudErrNoMem, "bud_config_t null config passed in");
       goto end;
@@ -281,6 +281,7 @@ bud_config_t* bud_config_load(const char* path, int inlined, bud_error_t* err) {
     goto failed_load_tracing;
 
   config->inlined = inlined;
+  config->piped = path == NULL ? 1 : 0;
 
   /* Allocate contexts and backends */
   contexts = json_object_get_array(obj, "contexts");

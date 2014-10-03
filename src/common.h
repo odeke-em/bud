@@ -89,4 +89,10 @@ void* bud_hashmap_get(bud_hashmap_t* hashmap,
                       unsigned int key_len);
 
 bud_error_t bud_read_file_by_fd(int fd, char** buffer);
+
+/* Numeric helpers */
+
+double numeric_width_base10(long x);
+char* padded_int_str(size_t x, int* len_save);
+
 #endif  /* SRC_COMMON_H_ */

@@ -1,3 +1,5 @@
+#include <math.h>   /* log10 */
+#include <limits.h> /* INT_MAX */
 #include <errno.h>
 #include <stdint.h>
 #include "openssl/ssl.h"
@@ -365,6 +367,44 @@ void* bud_hashmap_get(bud_hashmap_t* hashmap,
     return NULL;
 
   return item->value;
+}
+
+
+double numeric_width_base10(long x) {
+  if (x == 0)
+    return 1;
+
+  return 1 + ceill(log10(abs(x))); /* Mandatory left over MSD below 10 claims 1 digit */
+}
+
+
+char* padded_int_str(size_t x, int* len_save) {
+  int width;
+  int max_int_width;
+
+  char* str;
+  char* offset;
+
+  max_int_width = numeric_width_base10(INT_MAX);
+  str = malloc(max_int_width + 1);
+  if (str != NULL) {
+    /* Goal is to pad x so that eg: 12 becomes 0000000012*/
+
+    offset = str;
+
+    do
+      *offset++ = '0';
+    while ((offset - str) < max_int_width);
+
+    width = numeric_width_base10(x);
+    offset = str + (max_int_width - width);
+    snprintf(offset, width, "%zd", x);
+    offset[width] = '\0';
+
+    *len_save = max_int_width;
+  }
+
+  return str;
 }
 
 
