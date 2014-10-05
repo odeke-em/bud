@@ -374,7 +374,7 @@ double numeric_width_base10(long x) {
   if (x == 0)
     return 1;
 
-  return 1 + ceill(log10(abs(x))); /* Mandatory left over MSD below 10 claims 1 digit */
+  return 1 + ceil(log10(abs(x))); /* Mandatory left over MSD below 10 claims 1 digit */
 }
 
 
