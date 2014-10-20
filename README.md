@@ -31,7 +31,7 @@ You must have gcc installed. Chances are that you do, but in case you don't:
 Bud can easily be installed using [npm](http://npmjs.org)
 
 ``` bash
-[sudo] npm install bud-tls
+[sudo] npm install -g bud-tls
 ```
 
 This will install the command line tool `bud`.  Optionally, you can build
@@ -151,7 +151,7 @@ to get the default configuration options (with comments and description below):
 
     // **Optional** Cipher suites to use
     // Bud defaults to a very inclusive set of ciphers, a modern set might be:
-    // **Recommend** "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA256:ECDHE-RSA-AES256-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA256:DHE-RSA-AES256-SHA256:AES256-GCM-SHA384:AES256-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:AES128-GCM-SHA256:AES128-SHA256:AES128-SHA:DES-CBC3-SHA"
+    // **Recommended** "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA256:ECDHE-RSA-AES256-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA256:DHE-RSA-AES256-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:AES256-GCM-SHA384:AES256-SHA256:AES128-GCM-SHA256:AES128-SHA256:AES128-SHA:DES-CBC3-SHA"
     "ciphers": null,
 
     // **Optional** ECDH Curve to use, defaults to `prime256v1
