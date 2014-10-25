@@ -443,13 +443,14 @@ void bud_ipc_msg_send_cb(uv_write_t* req, int status) {
   bud_ipc_msg_handle_t* msg;
  
   bread_crumb_str("Status: %d\n", status);
-  /* Should be already freed, or will be soon */
-  if (status == UV_ECANCELED)
-    return;
 
   msg = container_of(req, bud_ipc_msg_handle_t, req);
   bread_crumb_str("msg_handle: %p", msg);
   uv_close((uv_handle_t*) &msg->tcp, bud_ipc_msg_handle_on_close);
+
+  /* Ignore ECANCELED */
+  if (status == UV_ECANCELED)
+    return;
 
   /* Error */
   if (status != 0) {
