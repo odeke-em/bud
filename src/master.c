@@ -316,7 +316,9 @@ bud_error_t bud_master_spawn_worker(bud_worker_t* worker) {
   bud_config_t* config;
   int i;
   int r;
+  int aux_argc;
   uv_process_options_t options;
+  char* aux_argv[10] = {"--worker", NULL, NULL, NULL}; /* 10 should suffice to add extra arguments */
 
   config = worker->config;
   ASSERT(config != NULL, "Worker config absent");
@@ -343,20 +345,28 @@ bud_error_t bud_master_spawn_worker(bud_worker_t* worker) {
   options.file = config->exepath;
   options.stdio_count = 3;
   options.stdio = calloc(options.stdio_count, sizeof(*options.stdio));
-  options.args = calloc(config->argc + 2, sizeof(*options.args));
+
+  aux_argc = sizeof(aux_argv)/sizeof(*aux_argv);
+  options.args = calloc(config->argc + aux_argc, sizeof(*options.args));
+
+  /* Config was passed in via stdin to master, now send it inlined to the workers */
+  if (config->piped) {
+    aux_argv[1] = "-i";
+    aux_argv[2] = config->path;
+  }
+
   if (options.stdio == NULL || options.args == NULL) {
     err = bud_error(kBudErrNoMem);
     goto done;
   }
 
   for (i = 0; i < config->argc; i++)
-    printf("arg[%d] : %s\n", i, config->argv[i]);
-
-  /* args = { config.argv, "--worker" } */
-  for (i = 0; i < config->argc; i++)
     options.args[i] = config->argv[i];
-  options.args[i] = "--worker";
-  options.args[i + 1] = NULL;
+
+  /* Load the auxilliary options ie: { "--worker", etc } */
+  for (r = 0; r < aux_argc; i++, ++r) {
+    options.args[i] = aux_argv[r];
+  }
 
   r = uv_timer_init(config->loop, &worker->restart_timer);
   if (r != 0) {
@@ -394,14 +404,6 @@ bud_error_t bud_master_spawn_worker(bud_worker_t* worker) {
       bread_crumb_str("Try balancing!");
       config->pending_accept = 0;
       bud_master_balance(config->server);
-    } else {
-      bread_crumb_str("Done balancing!");
-      if (config->piped) {
-        bread_crumb_str("Since is piped!");
-        err = bud_master_send_config(worker, config->server);
-        if (!bud_is_ok(err))
-          goto failed_ipc_init;
-      }
     }
   }
 
