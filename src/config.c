@@ -83,6 +83,9 @@ static bud_error_t bud_config_load_backend(
     unsigned int* ext_count);
 static bud_config_balance_t bud_config_balance_to_enum(const char* balance);
 
+static int bud_config_to_file(FILE *ofp, const bud_config_t config,
+                                            const bud_context_t context);
+
 
 int kBudSSLConfigIndex = -1;
 int kBudSSLClientIndex = -1;
@@ -966,6 +969,111 @@ void bud_print_version() {
           BUD_VERSION_PATCH);
 }
 
+static int bud_config_to_file(FILE *ofp, const bud_config_t config,
+                                            const bud_context_t context) {
+  if (ofp == NULL)
+      return -1;
+
+  fprintf(ofp, "{\n");
+  fprintf(ofp, "  \"daemon\": false,\n");
+  fprintf(ofp, "  \"workers\": %d,\n", config.worker_count);
+  fprintf(ofp, "  \"restart_timeout\": %d,\n", config.restart_timeout);
+  fprintf(ofp, "  \"log\": {\n");
+  fprintf(ofp, "    \"level\": \"%s\",\n", config.log.level);
+  fprintf(ofp, "    \"facility\": \"%s\",\n", config.log.facility);
+  fprintf(ofp,
+          "    \"stdio\": %s,\n",
+          config.log.stdio ? "true" : "false");
+  fprintf(ofp,
+          "    \"syslog\": %s\n",
+          config.log.syslog ? "true" : "false");
+  fprintf(ofp, "  },\n");
+  fprintf(ofp, "  \"availability\": {\n");
+  fprintf(ofp,
+      "    \"death_timeout\": %d,\n",
+          config.availability.death_timeout);
+  fprintf(ofp,
+          "    \"revive_interval\": %d,\n",
+          config.availability.revive_interval);
+  fprintf(ofp,
+          "    \"retry_interval\": %d,\n",
+          config.availability.retry_interval);
+  fprintf(ofp,
+          "    \"max_retries\": %d\n",
+          config.availability.max_retries);
+  fprintf(ofp, "  },\n");
+  fprintf(ofp, "  \"frontend\": {\n");
+  fprintf(ofp, "    \"port\": %d,\n", config.frontend.port);
+  fprintf(ofp, "    \"host\": \"%s\",\n", config.frontend.host);
+  fprintf(ofp, "    \"keepalive\": %d,\n", config.frontend.keepalive);
+  fprintf(ofp, "    \"security\": \"%s\",\n", config.frontend.security);
+  fprintf(ofp, "    \"server_preference\": true,\n");
+  fprintf(ofp,
+          "    \"max_send_fragment\": %d,\n",
+          config.frontend.max_send_fragment);
+  if (config.frontend.allow_half_open)
+    fprintf(ofp, "    \"allow_half_open\": true,\n");
+  else
+    fprintf(ofp, "    \"allow_half_open\": false,\n");
+#ifdef OPENSSL_NPN_NEGOTIATED
+  /* Sorry, hard-coded */
+  fprintf(ofp, "    \"npn\": [\"http/1.1\", \"http/1.0\"],\n");
+#endif  /* OPENSSL_NPN_NEGOTIATED */
+  if (context.ciphers != NULL)
+    fprintf(ofp, "    \"ciphers\": \"%s\",\n", context.ciphers);
+  else
+    fprintf(ofp, "    \"ciphers\": null,\n");
+  if (context.ecdh != NULL)
+    fprintf(ofp, "    \"ecdh\": \"%s\",\n", context.ecdh);
+  else
+    fprintf(ofp, "    \"ecdh\": null,\n");
+  if (context.dh_file != NULL)
+    fprintf(ofp, "    \"dh\": \"%s\",\n", context.dh_file);
+  else
+    fprintf(ofp, "    \"dh\": null,\n");
+  fprintf(ofp, "    \"cert\": \"%s\",\n", context.cert_file);
+  fprintf(ofp, "    \"key\": \"%s\",\n", context.key_file);
+  fprintf(ofp, "    \"passphrase\": null,\n");
+  fprintf(ofp, "    \"ticket_key\": null,\n");
+  fprintf(ofp, "    \"ticket_timedout\": %d,\n", context.ticket_timeout);
+  fprintf(ofp, "    \"request_cert\": false,\n");
+  fprintf(ofp, "    \"optional_cert\": false,\n");
+  fprintf(ofp, "    \"ca\": null,\n");
+  fprintf(ofp, "    \"reneg_window\": %d,\n", config.frontend.reneg_window);
+  fprintf(ofp, "    \"reneg_limit\": %d\n", config.frontend.reneg_limit);
+  fprintf(ofp, "  },\n");
+  fprintf(ofp, "  \"balance\": \"%s\",\n", config.balance);
+  fprintf(ofp, "  \"user\": null,\n");
+  fprintf(ofp, "  \"group\": null,\n");
+  fprintf(ofp, "  \"backend\": [{\n");
+  fprintf(ofp, "    \"port\": %d,\n", context.backend.list[0].port);
+  fprintf(ofp, "    \"host\": \"%s\",\n", context.backend.list[0].host);
+  fprintf(ofp,
+          "    \"keepalive\": %d,\n",
+          context.backend.list[0].keepalive);
+  fprintf(ofp, "    \"proxyline\": false,\n");
+  fprintf(ofp, "    \"x-forward\": false\n");
+  fprintf(ofp, "  }],\n");
+  fprintf(ofp, "  \"sni\": {\n");
+  fprintf(ofp, "    \"enabled\": false,\n");
+  fprintf(ofp, "    \"port\": %d,\n", config.sni.port);
+  fprintf(ofp, "    \"host\": \"%s\",\n", config.sni.host);
+  fprintf(ofp, "    \"url\": \"%s\"\n", config.sni.url);
+  fprintf(ofp, "  },\n");
+  fprintf(ofp, "  \"stapling\": {\n");
+  fprintf(ofp, "    \"enabled\": false,\n");
+  fprintf(ofp, "    \"port\": %d,\n", config.stapling.port);
+  fprintf(ofp, "    \"host\": \"%s\",\n", config.stapling.host);
+  fprintf(ofp, "    \"url\": \"%s\"\n", config.stapling.url);
+  fprintf(ofp, "  },\n");
+  fprintf(ofp, "  \"contexts\": [],\n");
+  fprintf(ofp, "  \"tracing\": {\n");
+  fprintf(ofp, "    \"dso\": []\n");
+  fprintf(ofp, "  }\n");
+  fprintf(ofp, "}\n");
+  return 0;
+}
+
 
 void bud_config_print_default() {
   bud_config_t config;
@@ -996,104 +1104,7 @@ void bud_config_print_default() {
   context.ticket_timeout = -1;
 
   bud_config_set_defaults(&config);
-
-  fprintf(stdout, "{\n");
-  fprintf(stdout, "  \"daemon\": false,\n");
-  fprintf(stdout, "  \"workers\": %d,\n", config.worker_count);
-  fprintf(stdout, "  \"restart_timeout\": %d,\n", config.restart_timeout);
-  fprintf(stdout, "  \"log\": {\n");
-  fprintf(stdout, "    \"level\": \"%s\",\n", config.log.level);
-  fprintf(stdout, "    \"facility\": \"%s\",\n", config.log.facility);
-  fprintf(stdout,
-          "    \"stdio\": %s,\n",
-          config.log.stdio ? "true" : "false");
-  fprintf(stdout,
-          "    \"syslog\": %s\n",
-          config.log.syslog ? "true" : "false");
-  fprintf(stdout, "  },\n");
-  fprintf(stdout, "  \"availability\": {\n");
-  fprintf(stdout,
-      "    \"death_timeout\": %d,\n",
-          config.availability.death_timeout);
-  fprintf(stdout,
-          "    \"revive_interval\": %d,\n",
-          config.availability.revive_interval);
-  fprintf(stdout,
-          "    \"retry_interval\": %d,\n",
-          config.availability.retry_interval);
-  fprintf(stdout,
-          "    \"max_retries\": %d\n",
-          config.availability.max_retries);
-  fprintf(stdout, "  },\n");
-  fprintf(stdout, "  \"frontend\": {\n");
-  fprintf(stdout, "    \"port\": %d,\n", config.frontend.port);
-  fprintf(stdout, "    \"host\": \"%s\",\n", config.frontend.host);
-  fprintf(stdout, "    \"keepalive\": %d,\n", config.frontend.keepalive);
-  fprintf(stdout, "    \"security\": \"%s\",\n", config.frontend.security);
-  fprintf(stdout, "    \"server_preference\": true,\n");
-  fprintf(stdout,
-          "    \"max_send_fragment\": %d,\n",
-          config.frontend.max_send_fragment);
-  if (config.frontend.allow_half_open)
-    fprintf(stdout, "    \"allow_half_open\": true,\n");
-  else
-    fprintf(stdout, "    \"allow_half_open\": false,\n");
-#ifdef OPENSSL_NPN_NEGOTIATED
-  /* Sorry, hard-coded */
-  fprintf(stdout, "    \"npn\": [\"http/1.1\", \"http/1.0\"],\n");
-#endif  /* OPENSSL_NPN_NEGOTIATED */
-  if (context.ciphers != NULL)
-    fprintf(stdout, "    \"ciphers\": \"%s\",\n", context.ciphers);
-  else
-    fprintf(stdout, "    \"ciphers\": null,\n");
-  if (context.ecdh != NULL)
-    fprintf(stdout, "    \"ecdh\": \"%s\",\n", context.ecdh);
-  else
-    fprintf(stdout, "    \"ecdh\": null,\n");
-  if (context.dh_file != NULL)
-    fprintf(stdout, "    \"dh\": \"%s\",\n", context.dh_file);
-  else
-    fprintf(stdout, "    \"dh\": null,\n");
-  fprintf(stdout, "    \"cert\": \"%s\",\n", context.cert_file);
-  fprintf(stdout, "    \"key\": \"%s\",\n", context.key_file);
-  fprintf(stdout, "    \"passphrase\": null,\n");
-  fprintf(stdout, "    \"ticket_key\": null,\n");
-  fprintf(stdout, "    \"ticket_timedout\": %d,\n", context.ticket_timeout);
-  fprintf(stdout, "    \"request_cert\": false,\n");
-  fprintf(stdout, "    \"optional_cert\": false,\n");
-  fprintf(stdout, "    \"ca\": null,\n");
-  fprintf(stdout, "    \"reneg_window\": %d,\n", config.frontend.reneg_window);
-  fprintf(stdout, "    \"reneg_limit\": %d\n", config.frontend.reneg_limit);
-  fprintf(stdout, "  },\n");
-  fprintf(stdout, "  \"balance\": \"%s\",\n", config.balance);
-  fprintf(stdout, "  \"user\": null,\n");
-  fprintf(stdout, "  \"group\": null,\n");
-  fprintf(stdout, "  \"backend\": [{\n");
-  fprintf(stdout, "    \"port\": %d,\n", context.backend.list[0].port);
-  fprintf(stdout, "    \"host\": \"%s\",\n", context.backend.list[0].host);
-  fprintf(stdout,
-          "    \"keepalive\": %d,\n",
-          context.backend.list[0].keepalive);
-  fprintf(stdout, "    \"proxyline\": false,\n");
-  fprintf(stdout, "    \"x-forward\": false\n");
-  fprintf(stdout, "  }],\n");
-  fprintf(stdout, "  \"sni\": {\n");
-  fprintf(stdout, "    \"enabled\": false,\n");
-  fprintf(stdout, "    \"port\": %d,\n", config.sni.port);
-  fprintf(stdout, "    \"host\": \"%s\",\n", config.sni.host);
-  fprintf(stdout, "    \"url\": \"%s\"\n", config.sni.url);
-  fprintf(stdout, "  },\n");
-  fprintf(stdout, "  \"stapling\": {\n");
-  fprintf(stdout, "    \"enabled\": false,\n");
-  fprintf(stdout, "    \"port\": %d,\n", config.stapling.port);
-  fprintf(stdout, "    \"host\": \"%s\",\n", config.stapling.host);
-  fprintf(stdout, "    \"url\": \"%s\"\n", config.stapling.url);
-  fprintf(stdout, "  },\n");
-  fprintf(stdout, "  \"contexts\": [],\n");
-  fprintf(stdout, "  \"tracing\": {\n");
-  fprintf(stdout, "    \"dso\": []\n");
-  fprintf(stdout, "  }\n");
-  fprintf(stdout, "}\n");
+  bud_config_to_file(stdout, config, context);
 }
 
 
